@@ -1,5 +1,16 @@
 ---
-- import_tasks: gather_backup_info.yaml
+- block:
+    - import_tasks: gather_backup_info.yaml
+    - fail:
+        msg: |
+          #===== FAIL =====#
+          Cannot backup {{ vm }}. Not enough space
+          #===== FAIL =====#
+      when: disks_size < export_domain_free_space
+  when: not async_backup
+
+- fail:
+    msg: "Just as planned"
 - block:
     - name: "Check stale backups of {{ vm }}"
       fail:

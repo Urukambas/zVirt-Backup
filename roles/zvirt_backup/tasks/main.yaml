@@ -7,61 +7,10 @@
     username: "{{ engine_user }}"
     password: "{{ engine_password }}"
 - block:
-    - name: "Find export domain if not specified"
-      block:
-        - name: "Gather Facts about domains"
-          ovirt.ovirt.ovirt_storage_domain_info:
-            auth: "{{ ovirt_auth }}"
-            pattern: name=*
-          register: sd_info
-        - name: "Set export storage domain name"
-          set_fact:
-            export_domain: "{{ sd_info | json_query(query) | selectattr('type', '==', 'export') | map(attribute='name') | first }}"
-          vars:
-            query: "ovirt_storage_domains[*]"
-      rescue:
-        - fail:
-            msg: "Export domain doesn't exist"
-    - name: "Backing Up"
-      include_tasks: backup.yaml
-  when: async_backup
-  always:
-    - name: "Logout"
-      ovirt.ovirt.ovirt_auth:
-        ovirt_auth: "{{ ovirt_auth }}"
-        state: absent
-
-- block:
-    - name: "Gather list of VMs to backup"
-      ovirt_vm_info:
-        auth: "{{ ovirt_auth }}"
-        pattern: "tag=backup_{{ ansible_date_time['weekday'] }}"
-      register: vms_list
-    - set_fact:
-        vms_to_backup: "{{ vms_list | json_query('ovirt_vms[*].name') | list }}"
-    - name: "Find export domain if not specified"
-      block:
-        - name: "Gather Facts about domains"
-          ovirt.ovirt.ovirt_storage_domain_info:
-            auth: "{{ ovirt_auth }}"
-            pattern: name=*
-          register: sd_info
-        - name: "Set export storage domain name"
-          set_fact:
-            export_domain: "{{ sd_info | json_query(query) | selectattr('type', '==', 'export') | map(attribute='name') | first }}"
-          vars:
-            query: "ovirt_storage_domains[*]"
-      rescue:
-        - fail:
-            msg: "Export domain doesn't exist"
-
-    - name: "Backing Up"
-      include_tasks: backup.yaml
-      loop: "{{ vms_to_backup }}"
-      loop_control:
-        loop_var: vm
-      when: (vms_to_backup | length > 0)
-  when: not async_backup
+    - import_tasks: async.yaml
+      when: async_backup
+    - import_tasks: sequential.yaml
+      when: not async_backup
   always:
     - name: "Logout"
       ovirt.ovirt.ovirt_auth:
