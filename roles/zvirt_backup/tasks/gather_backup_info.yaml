@@ -11,19 +11,12 @@
     - name: "Set Export Domain Host"
       set_fact:
         export_domain_host: "{{ export_domain_info.ovirt_storage_domains[0].storage.address }}"
-    - debug:
-        msg: "Export domain host is '{{ export_domain_host}}'"
-      tags:
-        - never
-        - debug
 
     - name: "Find all backups"
       set_fact:
         all_backups: "{{ export_domain_info | json_query(query) }}"
       vars:
         query: "ovirt_storage_domains[0].vms[*].{name:name,id:id,disks:disk_attachments[*].id}"
-    - debug:
-        msg: "Total number of backups is {{ all_backups | length }}"
 
     - name: "Find relevant backups"
       set_fact:
@@ -31,10 +24,5 @@
       vars:
         query: "[*].name"
         regex: "^{{ vm }}-temp-backup.*"
-    - debug:
-        msg: "{{ vm }} has {{ relevant_backups | length }} backups, {{ (range(0, (relevant_backups | length - backup_count + 1))) | first | int + 1 }} stale backups will be removed"
-      tags:
-        - never
-        - debug
   tags:
     - always
