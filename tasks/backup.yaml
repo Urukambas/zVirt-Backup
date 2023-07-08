@@ -1,0 +1,7 @@
+---
+- name: "Backup zVirt VMs"
+  hosts: localhost
+  vars_files:
+    - ../backup_vars.yaml
+  roles:
+    - ../roles/zvirt_backup

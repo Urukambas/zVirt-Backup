@@ -1,54 +1,12 @@
 ---
 - name: "Backup zVirt VMs"
   hosts: localhost
+  gather_facts: false
 
-  vars:
-    engine_fqdn: zvirt.uruk.local
-    engine_user: admin@internal
-    engine_password: admin
-    backup_count: 2
-    async_backup: true
+  vars_files:
+    - backup_vars.yaml
   tasks:
-    - setup:
-    - name: "Login"
-      ovirt.ovirt.ovirt_auth:
-        hostname: "{{ engine_fqdn }}"
-        username: "{{ engine_user }}"
-        password: "{{ engine_password }}"
-
-    - name: "Gather list of VMs to backup"
-      ovirt_vm_info:
-        auth: "{{ ovirt_auth }}"
-        pattern: "tag=backup_{{ ansible_date_time['weekday'] }}"
-      register: vms_list
-      tags:
-        - always
-    - set_fact:
-        vms_to_backup: "{{ vms_list | json_query('ovirt_vms[*].name') | list }}"
-
-    - block:
-        - name: "start backup"
-          shell: "ansible-playbook backup_playbook.yaml"
+    - include_tasks: tasks/serial.yaml
       when: not async_backup
-
-    - block:
-        - name: "start backup"
-          shell: "ansible-playbook backup_playbook.yaml --extra-vars='vm={{ item }}'"
-          async: 7200
-          poll: 0
-          loop: "{{ vms_to_backup }}"
-          register: backup_status
-        - name: "Wait for finish"
-          async_status:
-            jid: "{{ item.ansible_job_id }}"
-          register: jobs
-          until: jobs.finished
-          retries: 320
-          delay: 20
-          loop: "{{ backup_status.results }}"
+    - include_tasks: tasks/async.yaml
       when: async_backup
-      always:
-        - name: "Logout"
-          ovirt_auth:
-            ovirt_auth: "{{ ovirt_auth }}"
-            state: absent
