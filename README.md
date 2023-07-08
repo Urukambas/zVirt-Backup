@@ -16,4 +16,5 @@
 - `ansible_user` и `ansible_ssh_pass` для доступа к хосту с Экспорт доменом. Нужно для удаления устаревших резервных копий (при необходимости нужно указать `ansible_become_password`)
 
 ## Автор
-Селезнёв Александр
+Селезнёв Александр / Seleznjov Alexander
+personal mail: number_ultra@mail.ru
