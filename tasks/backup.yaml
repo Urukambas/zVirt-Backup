@@ -1,0 +1,12 @@
+---
+- import_tasks: gather_backup_info.yaml
+- block:
+    - name: "Check stale backups of {{ vm }}"
+      fail:
+        msg: "There are {{ relevant_backups | length }} backups, while {{ backup_count }} backups required. Removing stale backups"
+      when: ( relevant_backups | length >= backup_count)
+    - include_tasks: create_backup.yaml
+  rescue:
+    - include_tasks: remove_stale_backups.yaml
+      loop: "{{ range(0, (relevant_backups | length - backup_count + 1)) | list }}"
+    - include_tasks: create_backup.yaml

@@ -1,0 +1,6 @@
+---
+backup_count: 2
+backup_date_format: "{{ ansible_date_time['date'] }}_{{ ansible_date_time['time'] | regex_replace(':','-') }}"
+# backup_timeout: 7200
+# backup_log: true
+# log_path: /var/log

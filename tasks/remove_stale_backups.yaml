@@ -1,0 +1,32 @@
+---
+- block:
+    - name: "Set stale {{ vm }} backup name"
+      set_fact:
+        vm_name_to_delete: "{{ relevant_backups | json_query(query) | sort | first }}"
+      vars:
+        query: "[*]"
+    - name: "Set stale {{ vm }} backup id"
+      set_fact:
+        vm_id_to_delete: "{{ all_backups | selectattr('name', '==', vm_name_to_delete) | map(attribute='id') | first }}"
+      vars:
+        query: "[*]"
+    - name: "Set stale {{ vm }} backup disks"
+      set_fact:
+        vm_disks_to_delete: "{{ all_backups | selectattr('name', '==', vm_name_to_delete) | map(attribute='disks') | first }}"
+      vars:
+        query: "[*]"
+
+    - name: "Remove stale {{ vm }} backup"
+      file:
+        path: "{{ export_domain_info.ovirt_storage_domains[0].storage.path}}/{{ export_domain_info.ovirt_storage_domains[0].id }}/master/vms/{{ vm_id_to_delete }}"
+        state: absent
+    - name: "Remove stale {{ vm }} backup disks"
+      file:
+        path: "{{ export_domain_info.ovirt_storage_domains[0].storage.path}}/{{ export_domain_info.ovirt_storage_domains[0].id }}/images/{{ stale_disk }}"
+        state: absent
+      loop: "{{ vm_disks_to_delete }}"
+      loop_control:
+        loop_var: stale_disk
+  delegate_to: "{{ export_domain_host }}"
+
+- import_tasks: gather_backup_info.yaml

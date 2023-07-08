@@ -1,0 +1,81 @@
+---
+- name: "Gather facts for ansible_date_time"
+  setup:
+  tags:
+    - always
+
+- name: "Login"
+  ovirt.ovirt.ovirt_auth:
+    hostname: "{{ engine_fqdn }}"
+    username: "{{ engine_user }}"
+    password: "{{ engine_password }}"
+  tags:
+    - always
+
+- name: "Gather list of VMs to backup"
+  ovirt_vm_info:
+    auth: "{{ ovirt_auth }}"
+    pattern: "tag=backup_{{ ansible_date_time['weekday'] }}"
+  register: vms_list
+  tags:
+    - always
+- set_fact:
+    vms_to_backup: "{{ vms_list | json_query('ovirt_vms[*].name') | list }}"
+  tags:
+    - always
+
+- debug:
+    msg: "List of VMs to backup {{ vms_to_backup }}"
+  tags:
+    - never
+    - debug
+
+- block:
+    - name: "Find export domain if not specified"
+      block:
+        - name: "Gather Facts about domains"
+          ovirt.ovirt.ovirt_storage_domain_info:
+            auth: "{{ ovirt_auth }}"
+            pattern: name=*
+          register: sd_info
+        - name: "Set export storage domain name"
+          set_fact:
+            export_domain: "{{ sd_info | json_query(query) | selectattr('type', '==', 'export') | map(attribute='name') | first }}"
+          vars:
+            query: "ovirt_storage_domains[*]"
+        - debug:
+            msg: "VMs backups will be exported to '{{ export_domain }}'"
+          tags:
+            - never
+            - debug
+      rescue:
+        - fail:
+            msg: "Export domain doesn't exist"
+      tags:
+        - always
+
+    - name: "Backing Up"
+      include_tasks: backup.yaml
+      loop: "{{ vms_to_backup }}"
+      loop_control:
+        loop_var: vm
+      tags:
+        - always
+    #   async: "{{ backup_timeout }}"
+    #   poll: 0
+    #   register: backing_up
+    # - name: "Wait for backups to be done"
+    #   async_status:
+    #     jid: "{{ item.ansible_job_id }}"
+    #   loop: "{{ backing_up.results }}"
+    #   until: job_result.finished
+    #   retries: "{{ backup_timeout // 20 }}"
+    #   delay: 20
+  when: (vms_to_backup | length > 0)
+  always:
+    - name: "Logout"
+      ovirt.ovirt.ovirt_auth:
+        ovirt_auth: "{{ ovirt_auth }}"
+        state: absent
+      tags:
+        - always
