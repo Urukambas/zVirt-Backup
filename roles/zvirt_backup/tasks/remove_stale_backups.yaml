@@ -28,5 +28,6 @@
       loop_control:
         loop_var: stale_disk
   delegate_to: "{{ export_domain_host }}"
+  become: true
 
 - import_tasks: gather_backup_info.yaml
