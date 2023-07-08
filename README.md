@@ -18,3 +18,6 @@
 ## Автор
 Селезнёв Александр / Seleznjov Alexander
 personal mail: number_ultra@mail.ru
+
+## TODO plans
+1. Logging: добавить логирование для бэкапов
