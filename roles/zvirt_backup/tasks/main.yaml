@@ -22,7 +22,6 @@
       rescue:
         - fail:
             msg: "Export domain doesn't exist"
-
     - name: "Backing Up"
       include_tasks: backup.yaml
   when: async_backup
