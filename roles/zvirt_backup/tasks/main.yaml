@@ -6,7 +6,6 @@
     hostname: "{{ engine_fqdn }}"
     username: "{{ engine_user }}"
     password: "{{ engine_password }}"
-- fail:
 - block:
     - name: "Find export domain if not specified"
       block:
