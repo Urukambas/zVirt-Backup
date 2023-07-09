@@ -21,3 +21,4 @@ personal mail: number_ultra@mail.ru
 
 ## TODO plans
 1. Logging: добавить логирование для бэкапов
+2. Free space checking: проверка наличия свободного места для бэкапа и free_space_threshold
