@@ -1,6 +1,0 @@
-{
-  "yaml.schemas": {
-    "https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/tasks": "file:///home/urukambas/zvirt_backup/roles/zvirt_backup/roles/sequential_backup/tasks/main.yaml"
-  },
-  "ansible.python.interpreterPath": "/usr/local/bin/python3"
-}
