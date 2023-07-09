@@ -1,18 +1,5 @@
 ---
 - block:
-    - ovirt_disk_info:
-        auth: "{{ ovirt_auth }}"
-        pattern: "vm_names={{ vm }}"
-      register: disks_info
-    - set_fact:
-        disks_size: "{{ disks_info | json_query(query) | sum }}"
-      vars:
-        query: "ovirt_disks[*].actual_size"
-    - debug:
-        var: disks_info
-  when: not async_backup
-
-- block:
     - name: "Gather list of VMs to backup"
       ovirt_vm_info:
         auth: "{{ ovirt_auth }}"
@@ -31,9 +18,20 @@
         disks_size: "{{ disks_info | json_query(query) | flatten | sum }}"
       vars:
         query: "results[*].ovirt_disks[*].actual_size"
-    - debug:
-        var: disks_size
   when: async_backup
+
+- block:
+    - ovirt_disk_info:
+        auth: "{{ ovirt_auth }}"
+        pattern: "vm_names={{ vm }}"
+      register: disks_info
+    - set_fact:
+        disks_size: "{{ disks_info | json_query(query) | sum }}"
+      vars:
+        query: "ovirt_disks[*].actual_size"
+    - debug:
+        var: disks_info
+  when: not async_backup
 
 - block:
     - name: "Gather info about export domain"
@@ -63,5 +61,3 @@
       vars:
         query: "[*].name"
         regex: "^{{ vm }}-temp-backup.*"
-  tags:
-    - always

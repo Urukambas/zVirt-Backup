@@ -23,8 +23,6 @@
       Not enough space to backup all VMs
       For async backup required available space for all backups
       #===== FAIL =====#
-  when: disks_size < export_domain_free_space
-- fail:
-    msg: "Just as planed"
+  when: disks_size > export_domain_free_space
 - name: "Backing Up"
   include_tasks: backup.yaml

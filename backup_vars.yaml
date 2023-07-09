@@ -3,7 +3,7 @@ engine_fqdn: zvirt.uruk.local
 engine_user: admin@internal
 engine_password: admin
 backup_count: 2
-async_backup: false
+async_backup: true
 backup_timeout: 3600
 
 ansible_user: root
