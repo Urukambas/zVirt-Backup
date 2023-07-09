@@ -12,7 +12,7 @@
     export_domain_host: "{{ export_domain_info.ovirt_storage_domains[0].storage.address }}"
 - name: "Find export domain available space"
   set_fact:
-    export_domain_free_space: "{{ export_domain_info.ovirt_storage_domains[0].available }}"
+    export_domain_available_space: "{{ export_domain_info.ovirt_storage_domains[0].available }}"
 
 - name: "Find all backups"
   set_fact:

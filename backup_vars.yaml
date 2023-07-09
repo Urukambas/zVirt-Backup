@@ -3,8 +3,9 @@ engine_fqdn: zvirt.example.ru
 engine_user: admin@internal
 engine_password: admin
 backup_count: 2
-async_backup: false
+async_backup: true
 backup_timeout: 3600
+backup_threshold: 1.2
 
 ansible_user: root
 ansible_ssh_pass: root

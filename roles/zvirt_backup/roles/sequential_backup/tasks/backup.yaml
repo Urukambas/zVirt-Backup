@@ -8,19 +8,43 @@
       loop_control:
         loop_var: vm
       register: disks_info
-    - name: "Find {{ vm }} disks size"
-      set_fact:
-        disks_size: "{{ disks_info | json_query(query) | flatten | sum }}"
+    - set_fact:
+        grouped_disks: "{{ disks_info | json_query(query) | first | groupby('storage_domain') }}"
       vars:
-        query: "results[*].ovirt_disks[*].actual_size"
-- import_tasks: backup_info.yaml
+        query: "results[*].ovirt_disks[*].{storage_domain:storage_domains[0].id, disk_id:id, disk_size:actual_size}"
+    - name: "Group {{ vm }} disks by Storage Domain"
+      set_fact:
+        disks_by_storage_domain: "{{ grouped_disks | json_query('[*].{storage_domain:[0], disks:[1][*].disk_id, disks_size:[1][*].disk_size}') }}"
+    - name: "Calculate total {{ vm }} disks size"
+      set_fact:
+        total_disks_size: "{{ disks_by_storage_domain | json_query(query) | flatten | sum }}"
+      vars:
+        query: "[*].disks_size[*]"
+    - set_fact:
+        disks_size_by_domain: "{{ disks_by_storage_domain | json_query(query) }}"
+      vars:
+        query: "[*].{storage_domain:storage_domain, disks_size:disks_size[*]}"
 
 - fail:
     msg: |
       #===== FAIL =====#
-      Not enough space in Export Domain to backup {{ vm }}
+      Not enough space in Storage Domain {{ storage_domain_name }} to create {{ vm }}'s backup
+      {{ (item.disks_size | json_query('[*]') | sum * backup_threshold) | int }} required and {{ storage_domain_available }} available
       #===== FAIL =====#
-  when: (disks_size | int) > (export_domain_free_space | int)
+  when: ((item.disks_size | json_query('[*]') | sum * backup_threshold) | int) > (storage_domain_available | int)
+  vars:
+    storage_domain_name: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', '37e7f5e9-93d1-43a4-a1ee-9f285bcd9b13') | map(attribute='name') | first }}"
+    storage_domain_available: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', '37e7f5e9-93d1-43a4-a1ee-9f285bcd9b13') | map(attribute='available') | first }}"
+  loop: "{{ disks_size_by_domain }}"
+
+- import_tasks: backup_info.yaml
+- fail:
+    msg: |
+      #===== FAIL =====#
+      Not enough space in Export Domain to create {{ vm }}'s backup
+      {{ (total_disks_size | int * backup_threshold) | int }} required and {{ export_domain_available_space | int }} available
+      #===== FAIL =====#
+  when: ((total_disks_size | int * backup_threshold) | int) > (export_domain_available_space | int)
 
 - block:
     - name: "Check stale backups of {{ vm }}"

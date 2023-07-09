@@ -3,3 +3,4 @@ backup_count: 2
 backup_date_format: "{{ ansible_date_time['date'] }}_{{ ansible_date_time['time'] | regex_replace(':','-') }}"
 async_backup: false
 backup_timeout: 3600
+backup_threshold: 1.2
