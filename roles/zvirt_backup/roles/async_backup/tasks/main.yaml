@@ -1,0 +1,24 @@
+---
+- setup:
+- name: "Login"
+  ovirt.ovirt.ovirt_auth:
+    hostname: "{{ engine_fqdn }}"
+    username: "{{ engine_user }}"
+    password: "{{ engine_password }}"
+
+- block:
+    - import_tasks: backup_info.yaml
+    - name: "Check stale backups of {{ vm }}"
+      fail:
+        msg: "There are {{ relevant_backups | length }} backups, while {{ backup_count }} backups required. Removing stale backups"
+      when: (relevant_backups | length) >= backup_count
+    - import_tasks: create_backup.yaml
+  rescue:
+    - include_tasks: remove_stale_backups.yaml
+      loop: "{{ range(0, (relevant_backups | length - backup_count + 1)) | list }}"
+    - import_tasks: create_backup.yaml
+  always:
+    - name: "Logout"
+      ovirt.ovirt.ovirt_auth:
+        ovirt_auth: "{{ ovirt_auth }}"
+        state: absent

@@ -1,21 +1,31 @@
 ---
-- name: "Find export domain if not specified"
-  block:
-    - name: "Gather Facts about domains"
+- block:
+    - ovirt_disk_info:
+        auth: "{{ ovirt_auth }}"
+        pattern: "vm_names={{ vm }}"
+      loop: "{{ vms_to_backup }}"
+      loop_control:
+        loop_var: vm
+      register: disks_info
+    - set_fact:
+        disks_size: "{{ disks_info | json_query(query) | flatten | sum }}"
+      vars:
+        query: "results[*].ovirt_disks[*].actual_size"
+- block:
+    - name: "Gather info about export domain"
       ovirt.ovirt.ovirt_storage_domain_info:
         auth: "{{ ovirt_auth }}"
-        pattern: name=*
-      register: sd_info
-    - name: "Set export storage domain name"
+        pattern: "name={{ export_domain }}"
+        follow:
+          - vms
+          - vms.disk_attachments
+      register: export_domain_info
+    - name: "Find Export Domain Host"
       set_fact:
-        export_domain: "{{ sd_info | json_query(query) | selectattr('type', '==', 'export') | map(attribute='name') | first }}"
-      vars:
-        query: "ovirt_storage_domains[*]"
-  rescue:
-    - fail:
-        msg: "Export domain doesn't exist"
-
-- import_tasks: gather_backup_info.yaml
+        export_domain_host: "{{ export_domain_info.ovirt_storage_domains[0].storage.address }}"
+    - name: "Find export domain available space"
+      set_fact:
+        export_domain_free_space: "{{ export_domain_info.ovirt_storage_domains[0].available }}"
 - fail:
     msg: |
       #===== FAIL =====#
@@ -23,6 +33,23 @@
       Not enough space to backup all VMs
       For async backup required available space for all backups
       #===== FAIL =====#
-  when: disks_size > export_domain_free_space
-- name: "Backing Up"
-  include_tasks: backup.yaml
+  when: (disks_size | int) > (export_domain_free_space | int)
+
+- block:
+    - name: "start backup"
+      shell: |
+        ansible-playbook roles/zvirt_backup/async_backup.yaml \
+        -e vm="{{ item }}" \
+        -e export_domain="{{ export_domain }}"
+      async: "{{ backup_timeout }}"
+      poll: 0
+      loop: "{{ vms_to_backup }}"
+      register: backup_status
+    - name: "Wait for finish"
+      async_status:
+        jid: "{{ item.ansible_job_id }}"
+      register: jobs
+      until: jobs.finished
+      retries: "{{ (backup_timeout / 20) | int }}"
+      delay: 20
+      loop: "{{ backup_status.results }}"

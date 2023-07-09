@@ -1,16 +1,46 @@
 ---
-- name: "Gather facts for ansible_date_time"
+- name: "Gather General Facts"
   setup:
+
 - name: "Login"
   ovirt.ovirt.ovirt_auth:
     hostname: "{{ engine_fqdn }}"
     username: "{{ engine_user }}"
     password: "{{ engine_password }}"
+
+- block:
+    - name: "Gather Facts about Storage Domains"
+      ovirt.ovirt.ovirt_storage_domain_info:
+        auth: "{{ ovirt_auth }}"
+        pattern: name=*
+      register: sd_info
+    - name: "Find Export Domain"
+      set_fact:
+        export_domain: "{{ sd_info | json_query(query) | selectattr('type', '==', 'export') | map(attribute='name') | first }}"
+      vars:
+        query: "ovirt_storage_domains[*]"
+  rescue:
+    - fail:
+        msg: "Export domain doesn't exist"
+
+- block:
+    - name: "Gather list of VMs to backup"
+      ovirt_vm_info:
+        auth: "{{ ovirt_auth }}"
+        pattern: "tag=backup_{{ ansible_date_time['weekday'] }}"
+      register: vms_list
+    - set_fact:
+        vms_to_backup: "{{ vms_list | json_query('ovirt_vms[*].name') | list }}"
+
 - block:
     - import_tasks: async.yaml
       when: async_backup
-    - import_tasks: sequential.yaml
+    - import_role:
+        name: roles/zvirt_backup/roles/sequential_backup
+      vars:
+        vms_to_backup: "{{ vms_to_backup }}"
       when: not async_backup
+  when: (vms_to_backup | length) > 0
   always:
     - name: "Logout"
       ovirt.ovirt.ovirt_auth:

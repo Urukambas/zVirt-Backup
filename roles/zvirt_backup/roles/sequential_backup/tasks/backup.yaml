@@ -1,0 +1,34 @@
+---
+- block:
+    - name: "Check {{ vm }} disks"
+      ovirt_disk_info:
+        auth: "{{ ovirt_auth }}"
+        pattern: "vm_names={{ vm }}"
+      loop: "{{ vms_to_backup }}"
+      loop_control:
+        loop_var: vm
+      register: disks_info
+    - name: "Find {{ vm }} disks size"
+      set_fact:
+        disks_size: "{{ disks_info | json_query(query) | flatten | sum }}"
+      vars:
+        query: "results[*].ovirt_disks[*].actual_size"
+- import_tasks: backup_info.yaml
+
+- fail:
+    msg: |
+      #===== FAIL =====#
+      Not enough space in Export Domain to backup {{ vm }}
+      #===== FAIL =====#
+  when: (disks_size | int) > (export_domain_free_space | int)
+
+- block:
+    - name: "Check stale backups of {{ vm }}"
+      fail:
+        msg: "There are {{ relevant_backups | length }} backups, while {{ backup_count }} backups required. Removing stale backups"
+      when: ( relevant_backups | length >= backup_count)
+    - include_tasks: create_backup.yaml
+  rescue:
+    - include_tasks: remove_stale_backups.yaml
+      loop: "{{ range(0, (relevant_backups | length - backup_count + 1)) | list }}"
+    - include_tasks: create_backup.yaml

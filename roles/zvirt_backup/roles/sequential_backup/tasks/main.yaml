@@ -1,0 +1,6 @@
+---
+- name: "Backing Up"
+  include_tasks: backup.yaml
+  loop: "{{ vms_to_backup }}"
+  loop_control:
+    loop_var: vm

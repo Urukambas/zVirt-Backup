@@ -1,0 +1,9 @@
+---
+- name: "Placeholder playbook for Async Backup"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - ../../backup_vars.yaml
+    - defaults/main.yaml
+  roles:
+    - roles/async_backup

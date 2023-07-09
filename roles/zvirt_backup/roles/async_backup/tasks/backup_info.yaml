@@ -1,0 +1,28 @@
+---
+- name: "Gather info about export domain"
+  ovirt.ovirt.ovirt_storage_domain_info:
+    auth: "{{ ovirt_auth }}"
+    pattern: "name={{ export_domain }}"
+    follow:
+      - vms
+      - vms.disk_attachments
+  register: export_domain_info
+- name: "Find Export Domain Host"
+  set_fact:
+    export_domain_host: "{{ export_domain_info.ovirt_storage_domains[0].storage.address }}"
+- name: "Find export domain available space"
+  set_fact:
+    export_domain_free_space: "{{ export_domain_info.ovirt_storage_domains[0].available }}"
+
+- name: "Find all backups"
+  set_fact:
+    all_backups: "{{ export_domain_info | json_query(query) }}"
+  vars:
+    query: "ovirt_storage_domains[0].vms[*].{name:name,id:id,disks:disk_attachments[*].id}"
+
+- name: "Find relevant backups"
+  set_fact:
+    relevant_backups: "{{ all_backups | json_query(query) | select('match', regex) | list }}"
+  vars:
+    query: "[*].name"
+    regex: "^{{ vm }}-temp-backup.*"

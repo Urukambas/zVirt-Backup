@@ -1,0 +1,34 @@
+---
+- name: "Create snapshot for {{ vm }}"
+  ovirt.ovirt.ovirt_snapshot:
+    auth: "{{ ovirt_auth }}"
+    vm_name: "{{ vm }}"
+    description: "{{ vm }}-{{ backup_date_format }}"
+    timeout: "{{ backup_timeout }}"
+  register: vm_snapshot
+- name: "Clone VM from {{ vm }}'s snapshot"
+  ovirt_vm:
+    auth: "{{ ovirt_auth }}"
+    snapshot_vm: "{{ vm }}"
+    snapshot_name: "{{ vm }}-{{ backup_date_format }}"
+    name: "{{ vm }}-temp-backup-{{ backup_date_format }}"
+    state: present
+    timeout: "{{ backup_timeout }}"
+- name: "Export {{ vm }}'s backup to export domain"
+  ovirt_vm:
+    auth: "{{ ovirt_auth }}"
+    name: "{{ vm }}-temp-backup-{{ backup_date_format }}"
+    state: exported
+    export_domain: "{{ export_domain }}"
+    timeout: "{{ backup_timeout }}"
+- name: "Remove temporal VM"
+  ovirt_vm:
+    auth: "{{ ovirt_auth }}"
+    name: "{{ vm }}-temp-backup-{{ backup_date_format }}"
+    state: absent
+- name: "Remove {{ vm }}'s snapshot"
+  ovirt_snapshot:
+    auth: "{{ ovirt_auth }}"
+    state: absent
+    vm_name: "{{ vm }}"
+    snapshot_id: "{{ vm_snapshot.snapshot.id }}"

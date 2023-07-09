@@ -5,9 +5,5 @@
 
   vars_files:
     - backup_vars.yaml
-  tasks:
-    - include_tasks: tasks/async.yaml
-      when: async_backup
-    - name: "start backup"
-      shell: "ansible-playbook tasks/backup.yaml"
-      when: not async_backup
+  roles:
+    - zvirt_backup
