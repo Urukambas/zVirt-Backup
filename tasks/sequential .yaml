@@ -1,3 +1,0 @@
----
-- name: "start backup"
-  shell: "ansible-playbook tasks/backup.yaml"

@@ -1,0 +1,55 @@
+---
+- block:
+    - ovirt_disk_info:
+        auth: "{{ ovirt_auth }}"
+        pattern: "vm_names={{ vm }}"
+      loop: "{{ vms_to_backup }}"
+      loop_control:
+        loop_var: vm
+      register: disks_info
+    - set_fact:
+        disks_size: "{{ disks_info | json_query(query) | flatten | sum }}"
+      vars:
+        query: "results[*].ovirt_disks[*].actual_size"
+- block:
+    - name: "Gather info about export domain"
+      ovirt.ovirt.ovirt_storage_domain_info:
+        auth: "{{ ovirt_auth }}"
+        pattern: "name={{ export_domain }}"
+        follow:
+          - vms
+          - vms.disk_attachments
+      register: export_domain_info
+    - name: "Find Export Domain Host"
+      set_fact:
+        export_domain_host: "{{ export_domain_info.ovirt_storage_domains[0].storage.address }}"
+    - name: "Find export domain available space"
+      set_fact:
+        export_domain_free_space: "{{ export_domain_info.ovirt_storage_domains[0].available }}"
+- fail:
+    msg: |
+      #===== FAIL =====#
+      Async backup enabled
+      Not enough space to backup all VMs
+      For async backup required available space for all backups
+      #===== FAIL =====#
+  when: (disks_size | int) > (export_domain_free_space | int)
+
+- block:
+    - name: "start backup"
+      shell: |
+        ansible-playbook roles/zvirt_backup/async_backup.yaml \
+        -e vm="{{ item }}" \
+        -e export_domain="{{ export_domain }}"
+      async: "{{ backup_timeout }}"
+      poll: 0
+      loop: "{{ vms_to_backup }}"
+      register: backup_status
+    - name: "Wait for finish"
+      async_status:
+        jid: "{{ item.ansible_job_id }}"
+      register: jobs
+      until: jobs.finished
+      retries: "{{ (backup_timeout / 20) | int }}"
+      delay: 20
+      loop: "{{ backup_status.results }}"
