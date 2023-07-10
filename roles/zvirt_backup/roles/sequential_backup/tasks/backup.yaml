@@ -33,8 +33,8 @@
       #===== FAIL =====#
   when: ((item.disks_size | json_query('[*]') | sum * backup_threshold) | int) > (storage_domain_available | int)
   vars:
-    storage_domain_name: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', '37e7f5e9-93d1-43a4-a1ee-9f285bcd9b13') | map(attribute='name') | first }}"
-    storage_domain_available: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', '37e7f5e9-93d1-43a4-a1ee-9f285bcd9b13') | map(attribute='available') | first }}"
+    storage_domain_name: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', item.storage_domain) | map(attribute='name') | list | first }}"
+    storage_domain_available: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', item.storage_domain) | map(attribute='available') | list | first }}"
   loop: "{{ disks_size_by_domain }}"
 
 - import_tasks: backup_info.yaml

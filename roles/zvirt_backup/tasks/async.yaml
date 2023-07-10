@@ -12,10 +12,10 @@
         grouped_disks: "{{ disks_info | json_query(query) | flatten | groupby('storage_domain') }}"
       vars:
         query: "results[*].ovirt_disks[*].{storage_domain:storage_domains[0].id, disk_id:id, disk_size:actual_size}"
-    - name: "Group {{ vm }} disks by Storage Domain"
+    - name: "Group VMs disks by Storage Domain"
       set_fact:
         disks_by_storage_domain: "{{ grouped_disks | json_query('[*].{storage_domain:[0], disks:[1][*].disk_id, disks_size:[1][*].disk_size}') }}"
-    - name: "Calculate total {{ vm }} disks size"
+    - name: "Calculate total VMs disks size"
       set_fact:
         total_disks_size: "{{ disks_by_storage_domain | json_query(query) | flatten | sum }}"
       vars:
@@ -33,8 +33,8 @@
       #===== FAIL =====#
   when: ((item.disks_size | json_query('[*]') | sum * backup_threshold) | int) > (storage_domain_available | int)
   vars:
-    storage_domain_name: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', '37e7f5e9-93d1-43a4-a1ee-9f285bcd9b13') | map(attribute='name') | first }}"
-    storage_domain_available: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', '37e7f5e9-93d1-43a4-a1ee-9f285bcd9b13') | map(attribute='available') | first }}"
+    storage_domain_name: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', item.storage_domain) | map(attribute='name') | list | first }}"
+    storage_domain_available: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', item.storage_domain) | map(attribute='available') | list | first }}"
   loop: "{{ disks_size_by_domain }}"
 
 - block:
