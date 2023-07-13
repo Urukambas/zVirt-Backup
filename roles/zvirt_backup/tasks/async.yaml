@@ -1,6 +1,6 @@
 ---
 - block:
-    - name: "Check VMs disks"
+    - name: "Gather information about disks to backup"
       ovirt_disk_info:
         auth: "{{ ovirt_auth }}"
         pattern: "vm_names={{ vm }}"
@@ -8,37 +8,40 @@
       loop_control:
         loop_var: vm
       register: disks_info
-    - set_fact:
+    - name: "Group disks by Storage Domain"
+      set_fact:
         grouped_disks: "{{ disks_info | json_query(query) | flatten | groupby('storage_domain') }}"
       vars:
         query: "results[*].ovirt_disks[*].{storage_domain:storage_domains[0].id, disk_id:id, disk_size:actual_size}"
-    - name: "Group VMs disks by Storage Domain"
+    - name: "Redefine grouped disks to easier parsing"
       set_fact:
         disks_by_storage_domain: "{{ grouped_disks | json_query('[*].{storage_domain:[0], disks:[1][*].disk_id, disks_size:[1][*].disk_size}') }}"
-    - name: "Calculate total VMs disks size"
+    - name: "Calculate total disks size"
       set_fact:
         total_disks_size: "{{ disks_by_storage_domain | json_query(query) | flatten | sum }}"
       vars:
         query: "[*].disks_size[*]"
-    - set_fact:
+    - name: "Calculate disks size by Storage Domain"
+      set_fact:
         disks_size_by_domain: "{{ disks_by_storage_domain | json_query(query) }}"
       vars:
         query: "[*].{storage_domain:storage_domain, disks_size:disks_size[*]}"
 
-- fail:
+- name: "Fail if not enough space in Data Storage Domains"
+  when: ((item.disks_size | json_query('[*]') | sum * backup_threshold) | int) > (storage_domain_available | int)
+  fail:
     msg: |
       #===== FAIL =====#
       Not enough space in Storage Domain {{ storage_domain_name }} to create async backups
       {{ (item.disks_size | json_query('[*]') | sum * backup_threshold) | int }} required and {{ storage_domain_available }} available
       #===== FAIL =====#
-  when: ((item.disks_size | json_query('[*]') | sum * backup_threshold) | int) > (storage_domain_available | int)
   vars:
     storage_domain_name: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', item.storage_domain) | map(attribute='name') | list | first }}"
     storage_domain_available: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', item.storage_domain) | map(attribute='available') | list | first }}"
   loop: "{{ disks_size_by_domain }}"
 
 - block:
-    - name: "Gather info about export domain"
+    - name: "Gather info about Export Storage Domain"
       ovirt.ovirt.ovirt_storage_domain_info:
         auth: "{{ ovirt_auth }}"
         pattern: "name={{ export_domain }}"
@@ -46,23 +49,24 @@
           - vms
           - vms.disk_attachments
       register: export_domain_info
-    - name: "Find Export Domain Host"
+    - name: "Set Export Storage Domain Host as variable"
       set_fact:
         export_domain_host: "{{ export_domain_info.ovirt_storage_domains[0].storage.address }}"
-    - name: "Find export domain available space"
+    - name: "Set Export Storage Domain available space as variable"
       set_fact:
         export_domain_available_space: "{{ export_domain_info.ovirt_storage_domains[0].available }}"
 
-- fail:
+- name: "Fail if not enough space in Export Storage Domain"
+  when: ((total_disks_size | int * backup_threshold) | int) > (export_domain_available_space | int)
+  fail:
     msg: |
       #===== FAIL =====#
       Not enough space in Export Domain to create async backups
       {{ (total_disks_size | int * backup_threshold) | int }} required and {{ export_domain_available_space | int }} available
       #===== FAIL =====#
-  when: ((total_disks_size | int * backup_threshold) | int) > (export_domain_available_space | int)
 
 - block:
-    - name: "start backup"
+    - name: "Start asynchronous backup"
       shell: |
         ansible-playbook roles/zvirt_backup/async_backup.yaml \
         -e vm="{{ item }}" \
@@ -71,7 +75,7 @@
       poll: 0
       loop: "{{ vms_to_backup }}"
       register: backup_status
-    - name: "Wait for finish"
+    - name: "Wait for asynchronous backup to finish"
       async_status:
         jid: "{{ item.ansible_job_id }}"
       register: jobs

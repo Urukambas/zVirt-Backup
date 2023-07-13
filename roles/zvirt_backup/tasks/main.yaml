@@ -1,20 +1,20 @@
 ---
-- name: "Gather General Facts"
+- name: "Gather general facts"
   setup:
 
-- name: "Login"
+- name: "Login into zVirt API"
   ovirt.ovirt.ovirt_auth:
     hostname: "{{ engine_fqdn }}"
     username: "{{ engine_user }}"
     password: "{{ engine_password }}"
 
 - block:
-    - name: "Gather Facts about Storage Domains"
+    - name: "Gather facts about all Storage Domains"
       ovirt.ovirt.ovirt_storage_domain_info:
         auth: "{{ ovirt_auth }}"
         pattern: name=*
       register: sd_info
-    - name: "Find Export Domain"
+    - name: "Set Export Storage Domain name as variable"
       set_fact:
         export_domain: "{{ sd_info | json_query(query) | selectattr('type', '==', 'export') | map(attribute='name') | first }}"
       vars:
@@ -33,16 +33,18 @@
         vms_to_backup: "{{ vms_list | json_query('ovirt_vms[*].name') | list }}"
 
 - block:
-    - import_tasks: async.yaml
+    - name: "Import async backup tasklist"
+      import_tasks: async.yaml
       when: async_backup
-    - import_role:
+    - name: "Import sequential backup role"
+      import_role:
         name: roles/zvirt_backup/roles/sequential_backup
       vars:
         vms_to_backup: "{{ vms_to_backup }}"
       when: not async_backup
   when: (vms_to_backup | length) > 0
   always:
-    - name: "Logout"
+    - name: "Logout from zVirt API"
       ovirt.ovirt.ovirt_auth:
         ovirt_auth: "{{ ovirt_auth }}"
         state: absent

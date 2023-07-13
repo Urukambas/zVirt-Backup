@@ -1,5 +1,5 @@
 ---
-- name: "Backing Up"
+- name: "Iterate backup tasklist on each VM from backing up list"
   include_tasks: backup.yaml
   loop: "{{ vms_to_backup }}"
   loop_control:

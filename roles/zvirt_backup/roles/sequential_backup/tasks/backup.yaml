@@ -1,6 +1,6 @@
 ---
 - block:
-    - name: "Check {{ vm }} disks"
+    - name: "Gather information about {{ vm }} disks"
       ovirt_disk_info:
         auth: "{{ ovirt_auth }}"
         pattern: "vm_names={{ vm }}"
@@ -8,11 +8,12 @@
       loop_control:
         loop_var: vm
       register: disks_info
-    - set_fact:
+    - name: "Group {{ vm }} disks by Storage Domain"
+      set_fact:
         grouped_disks: "{{ disks_info | json_query(query) | first | groupby('storage_domain') }}"
       vars:
         query: "results[*].ovirt_disks[*].{storage_domain:storage_domains[0].id, disk_id:id, disk_size:actual_size}"
-    - name: "Group {{ vm }} disks by Storage Domain"
+    - name: "Redefine {{ vm  }} grouped disks to easier parsing"
       set_fact:
         disks_by_storage_domain: "{{ grouped_disks | json_query('[*].{storage_domain:[0], disks:[1][*].disk_id, disks_size:[1][*].disk_size}') }}"
     - name: "Calculate total {{ vm }} disks size"
@@ -20,39 +21,46 @@
         total_disks_size: "{{ disks_by_storage_domain | json_query(query) | flatten | sum }}"
       vars:
         query: "[*].disks_size[*]"
-    - set_fact:
+    - name: "Calculate {[ vm }} disks size by Storage Domain"
+      set_fact:
         disks_size_by_domain: "{{ disks_by_storage_domain | json_query(query) }}"
       vars:
         query: "[*].{storage_domain:storage_domain, disks_size:disks_size[*]}"
 
-- fail:
+- name: "Fail if not enough space in Data Storage Domains"
+  when: ((item.disks_size | json_query('[*]') | sum * backup_threshold) | int) > (storage_domain_available | int)
+  fail:
     msg: |
       #===== FAIL =====#
       Not enough space in Storage Domain {{ storage_domain_name }} to create {{ vm }}'s backup
       {{ (item.disks_size | json_query('[*]') | sum * backup_threshold) | int }} required and {{ storage_domain_available }} available
       #===== FAIL =====#
-  when: ((item.disks_size | json_query('[*]') | sum * backup_threshold) | int) > (storage_domain_available | int)
   vars:
     storage_domain_name: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', item.storage_domain) | map(attribute='name') | list | first }}"
     storage_domain_available: "{{ sd_info | json_query('ovirt_storage_domains[*]') | selectattr('id', '==', item.storage_domain) | map(attribute='available') | list | first }}"
   loop: "{{ disks_size_by_domain }}"
 
-- import_tasks: backup_info.yaml
-- fail:
+- name: "Import info collector tasklist"
+  import_tasks: backup_info.yaml
+- name: "Fail if not enough space in Export Storage Domain"
+  when: ((total_disks_size | int * backup_threshold) | int) > (export_domain_available_space | int)
+  fail:
     msg: |
       #===== FAIL =====#
       Not enough space in Export Domain to create {{ vm }}'s backup
       {{ (total_disks_size | int * backup_threshold) | int }} required and {{ export_domain_available_space | int }} available
       #===== FAIL =====#
-  when: ((total_disks_size | int * backup_threshold) | int) > (export_domain_available_space | int)
 
 - block:
-    - name: "Check stale backups of {{ vm }}"
+    - name: "Check for {{ vm }} stale backups"
       fail:
         msg: "There are {{ relevant_backups | length }} backups, while {{ backup_count }} backups required. Removing stale backups"
       when: ( relevant_backups | length >= backup_count)
-    - include_tasks: create_backup.yaml
+    - name: "Include backup creation tasklist"
+      include_tasks: create_backup.yaml
   rescue:
-    - include_tasks: remove_stale_backups.yaml
+    - name: "Loop stale backup removal tasklist"
+      include_tasks: remove_stale_backups.yaml
       loop: "{{ range(0, (relevant_backups | length - backup_count + 1)) | list }}"
-    - include_tasks: create_backup.yaml
+    - name: "Include backup creation tasklist"
+      include_tasks: create_backup.yaml
