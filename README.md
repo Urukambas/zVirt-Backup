@@ -4,7 +4,20 @@
 ## Как запустить
 1. Создайте в zVirt теги в формате `backup_ДеньНедели`. День недели должен быть на английском и с заглавной буквы (пример `backup_Monday`, `backup_Friday`);
 2. Назначьте виртуальным машинам данные теги;
-3. Запустите роль в ручном режиме или добавьте запуск Playbook'а `playbook.yaml` в планировщик.
+3. Создайте файл с необходимыми переменными `backup_vars.yaml`; 
+4. Запустите роль в ручном режиме или добавьте запуск Playbook'а `playbook.yaml` в планировщик.
+
+```YAML
+---
+- name: "Backup zVirt VMs"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - backup_vars.yaml
+  roles:
+    - zvirt_backup
+```
 
 Роль обнаруживает экспорт домен (если он есть, иначе выдаёт ошибку) и список ВМ для резервного копирования. Указать нужно следующие переменные в файле `backup_vars.yaml`:
 | Variable                | Type    | Default | Description                                                                |
