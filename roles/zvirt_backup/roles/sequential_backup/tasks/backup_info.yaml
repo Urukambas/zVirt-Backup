@@ -1,4 +1,14 @@
 ---
+- name: "Select VMs ID"
+  block:
+    - name: "Gather information about VM"
+      ovirt_vm_info:
+        auth: "{{ ovirt_auth }}"
+        pattern: "name={{ vm }}"
+      register: vm_info
+    - set_fact:
+        vm_id: "{{ vm_info | json_query('ovirt_vms[*].id') | first }}"
+
 - name: "Gather info about Export Storage Domain"
   ovirt.ovirt.ovirt_storage_domain_info:
     auth: "{{ ovirt_auth }}"

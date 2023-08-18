@@ -5,7 +5,6 @@
     hostname: "{{ engine_fqdn }}"
     username: "{{ engine_user }}"
     password: "{{ engine_password }}"
-
 - block:
     - name: "Import info collector tasklist"
       import_tasks: backup_info.yaml
