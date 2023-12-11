@@ -35,4 +35,4 @@
     relevant_backups: "{{ all_backups | json_query(query) | select('match', regex) | list }}"
   vars:
     query: "[*].name"
-    regex: "^{{ vm }}-temp-backup.*"
+    regex: "^{{ vm }}_{{ vm_id[-4:] }}_MB*"
